@@ -1,0 +1,84 @@
+name: lunero
+
+services:
+  # Self-hosted Convex: database, functions, auth, scheduler, HTTP actions.
+  convex:
+    image: ghcr.io/convex/convex-backend:latest
+    stop_grace_period: 10s
+    stop_signal: SIGINT
+    ports:
+      - "3210:3210"
+      - "3211:3211"
+    volumes:
+      - convex-data:/convex/data
+    environment:
+      - CONVEX_CLOUD_ORIGIN=http://127.0.0.1:3210
+      - CONVEX_SITE_ORIGIN=http://127.0.0.1:3211
+      - DISABLE_BEACON=true
+      - DOCUMENT_RETENTION_DELAY=172800
+      - RUST_LOG=info
+    healthcheck:
+      test: curl -f http://localhost:3210/version
+      interval: 5s
+      start_period: 10s
+
+  convex-dashboard:
+    image: ghcr.io/convex/convex-dashboard:latest
+    stop_grace_period: 10s
+    stop_signal: SIGINT
+    ports:
+      - "6791:6791"
+    environment:
+      - NEXT_PUBLIC_DEPLOYMENT_URL=http://127.0.0.1:3210
+    depends_on:
+      convex:
+        condition: service_healthy
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+
+  # S3-compatible object storage for proof-of-work files. The upstream minio/minio
+  # image is no longer published, so we use the maintained pgsty community build.
+  minio:
+    image: pgsty/minio:latest
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY_ID:-lunero}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_ACCESS_KEY:-lunero-secret}
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+
+  minio-init:
+    image: pgsty/minio:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 $${MINIO_USER} $${MINIO_PASSWORD} &&
+      mc mb --ignore-existing local/$${BUCKET} &&
+      mc anonymous set none local/$${BUCKET}
+      "
+    environment:
+      MINIO_USER: ${S3_ACCESS_KEY_ID:-lunero}
+      MINIO_PASSWORD: ${S3_SECRET_ACCESS_KEY:-lunero-secret}
+      BUCKET: ${S3_BUCKET:-lunero}
+    restart: "no"
+
+volumes:
+  convex-data:
+  redis-data:
+  minio-data:

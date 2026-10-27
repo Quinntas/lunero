@@ -1,0 +1,27 @@
+{
+  "name": "@workspace/backend",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./api": "./convex/_generated/api.js",
+    "./dataModel": "./convex/_generated/dataModel.d.ts",
+    "./shared/*": "./convex/shared/*.ts"
+  },
+  "scripts": {
+    "dev": "convex dev",
+    "deploy": "convex deploy",
+    "codegen": "convex codegen",
+    "typecheck": "tsc --noEmit -p convex"
+  },
+  "dependencies": {
+    "@auth/core": "^0.41.3",
+    "@convex-dev/auth": "^0.0.96",
+    "convex": "^1.48.0",
+    "stripe": "^23.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "typescript": "^6.0.2"
+  }
+}
