@@ -10,3 +10,4 @@ dist-ssr
 .tanstack
 .output
 *.tsbuildinfo
+docs_tcc
